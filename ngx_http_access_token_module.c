@@ -188,12 +188,14 @@ static ngx_int_t ngx_http_access_token_handler(ngx_http_request_t *r)
     }
 
     plain     = ngx_http_access_token_build_plain_text(r, &ctx);
-    check_sig = ngx_http_access_token_hmac(r->pool, plain, &conf->secret);
+    check_sig = ngx_http_access_token_hmac(r->pool, &conf->secret, plain);
 
     if(ngx_strcmp(ctx.sig, check_sig) == 0) {
         return NGX_OK;
     } else {
-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Invalid signature: %s => %s:%s", plain->data, check_sig, ctx.sig);
+        if (ctx.sig != NULL) {
+            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Invalid signature: %s => %s:%s", plain->data, check_sig, ctx.sig);
+        }
         return NGX_HTTP_FORBIDDEN;
     }
 
@@ -204,7 +206,7 @@ static void ngx_http_access_token_parse_args(ngx_http_request_t *r, ngx_http_acc
 {
     u_char *buf;
     char   *tk, *sp1, *sp2, *k, *v;
-    size_t l, ll;
+    size_t i, l, ll, lll;
 
     l = r->args.len;
 
@@ -231,10 +233,15 @@ static void ngx_http_access_token_parse_args(ngx_http_request_t *r, ngx_http_acc
                 }
                 ngx_cpystrn(ctx->expires, (u_char *)v, ll + 1);
             } else if (ngx_strcmp(k, "Signature") == 0) {
-                if ((ctx->sig = ngx_palloc(r->pool, ll + 1)) == NULL) {
+                lll = ll % 4;
+                lll = lll == 0 ? 0 : 4 - lll;
+                if ((ctx->sig = ngx_pcalloc(r->pool, ll + lll + 1)) == NULL) {
                     return;
                 }
                 ngx_cpystrn(ctx->sig, (u_char *)v, ll + 1);
+                for (i=0;i<lll;i++) {
+                    ctx->sig[ll+i] = '=';
+                }
             }
         }
         tk = strtok_r(NULL, "&", &sp1);
@@ -251,16 +258,15 @@ static u_char *ngx_http_access_token_hmac(ngx_pool_t *pool, ngx_str_t *key, ngx_
 
     evp_md = EVP_sha1();
     HMAC(evp_md, key->data, key->len, text->data, text->len, md, &md_len);
-    if ((result = ngx_palloc(pool, ngx_base64_encoded_length(md_len) + 1)) == NULL) {
+    if ((result = ngx_pcalloc(pool, ngx_base64_encoded_length(md_len) + 1)) == NULL) {
         return NULL;
     }
+
     dst.data = result;
     dst.len  = ngx_base64_encoded_length(md_len);
     src.data = md;
     src.len  = md_len;
     ngx_encode_base64(&dst, &src);
-
-    result[dst.len - 1] = '\0';
 
     return result;
 }
@@ -278,11 +284,16 @@ static ngx_str_t *ngx_http_access_token_build_plain_text(ngx_http_request_t *r, 
 
     len = r->method_name.len + r->uri.len + ngx_strlen(ctx->expires) + ngx_strlen(ctx->access_key);
 
-    method_name = ngx_pstrdup(r->pool, &r->method_name);
-    method_name[r->method_name.len] = '\0';
+    if ((method_name = ngx_palloc(r->pool, r->method_name.len + 1)) == NULL) {
+        return NULL;
+    }
 
-    uri = ngx_pstrdup(r->pool, &r->uri);
-    uri[r->uri.len] = '\0';
+    if ((uri = ngx_palloc(r->pool, r->uri.len + 1)) == NULL) {
+        return NULL;
+    }
+
+    ngx_cpystrn(method_name, r->method_name.data, r->method_name.len + 1);
+    ngx_cpystrn(uri,         r->uri.data,         r->uri.len + 1);
 
     if ((buf = ngx_palloc(r->pool, len + 1)) == NULL) {
         return NULL;
