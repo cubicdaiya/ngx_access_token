@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*-
+#
+# Copyright (C) 2013 Tatsuhiko Kubo <cubicdaiya@gmail.com>
+#
+# signature generator
+#
 
 import sys
 import hmac
@@ -41,7 +46,7 @@ if __name__ == '__main__':
             raw = build_raw(args)
         except:
             parser.print_help()
-            sys.exit(0)            
+            sys.exit(0)
 
     hashed = hmac.new(args.secret, raw, sha1)
     print binascii.b2a_base64(hashed.digest())[:-1]
