@@ -33,7 +33,7 @@ static ngx_str_t *ngx_http_access_token_build_plain_text(ngx_http_request_t *r, 
 static ngx_command_t ngx_http_access_token_commands[] = {
     { 
         ngx_string("access_token_access_key"),
-        NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+        NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
         ngx_conf_set_str_slot,
         NGX_HTTP_LOC_CONF_OFFSET,
         offsetof(ngx_http_access_token_conf_t, access_key),
@@ -41,7 +41,7 @@ static ngx_command_t ngx_http_access_token_commands[] = {
     },
     { 
         ngx_string("access_token_secret"),
-        NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+        NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
         ngx_conf_set_str_slot,
         NGX_HTTP_LOC_CONF_OFFSET,
         offsetof(ngx_http_access_token_conf_t, secret),
@@ -49,7 +49,7 @@ static ngx_command_t ngx_http_access_token_commands[] = {
     },
     { 
         ngx_string("access_token_check"),
-        NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
+        NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
         ngx_conf_set_flag_slot,
         NGX_HTTP_LOC_CONF_OFFSET,
         offsetof(ngx_http_access_token_conf_t, enable),
