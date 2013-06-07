@@ -219,7 +219,7 @@ static void ngx_http_access_token_parse_args(ngx_http_request_t *r, ngx_http_acc
     tk = strtok_r((char *)buf, "&", &sp1);
     while (tk != NULL) {
         k = strtok_r(tk,   "=", &sp2);
-        v = strtok_r(NULL, "=", &sp2);
+        v = strtok_r(NULL, "&", &sp2);
         if (k != NULL && v != NULL) {
             ll = ngx_strlen(v);
             if (ngx_strcmp(k, "AccessKey") == 0) {
