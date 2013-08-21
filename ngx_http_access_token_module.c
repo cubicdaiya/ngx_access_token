@@ -9,6 +9,17 @@
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
 
+#define NGX_HTTP_ACCESS_TOKEN_SET_ARG(r, arg, var)  \
+    if (var->not_found) {                           \
+        arg = NULL;                                 \
+    } else {                                        \
+        arg = ngx_pnalloc(r->pool, var->len + 1);   \
+        if (arg == NULL) {                          \
+            return;                                 \
+        }                                           \
+        ngx_cpystrn(arg, var->data, var->len + 1);  \
+    }
+
 typedef struct ngx_http_access_token_conf_t {
     ngx_flag_t enable;
     ngx_str_t access_key;
@@ -26,7 +37,7 @@ static ngx_int_t ngx_http_access_token_init(ngx_conf_t *cf);
 static char *ngx_http_access_token_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child);
 static ngx_int_t ngx_http_access_token_handler(ngx_http_request_t *r);
 static u_char *ngx_http_access_token_hmac(ngx_pool_t *pool, ngx_str_t *key, ngx_str_t *text);
-static void ngx_http_access_token_parse_args(ngx_http_request_t *r, ngx_http_access_token_ctx_t *ctx);
+static void ngx_http_access_token_set_args(ngx_http_request_t *r, ngx_http_access_token_ctx_t *ctx);
 static ngx_int_t ngx_http_access_token_is_invalid_conf(ngx_http_access_token_conf_t *conf);
 static ngx_str_t *ngx_http_access_token_build_plain_text(ngx_http_request_t *r, ngx_http_access_token_ctx_t *ctx);
 
@@ -151,7 +162,7 @@ static ngx_int_t ngx_http_access_token_is_invalid_args(ngx_http_access_token_ctx
 static ngx_int_t ngx_http_access_token_handler(ngx_http_request_t *r)
 {
     ngx_http_access_token_conf_t *conf = ngx_http_get_module_loc_conf(r, ngx_http_access_token_module);
-    ngx_http_access_token_ctx_t ctx = { 
+    ngx_http_access_token_ctx_t ctx = {
         .access_key = NULL,
         .expires    = NULL,
         .sig        = NULL,
@@ -169,7 +180,7 @@ static ngx_int_t ngx_http_access_token_handler(ngx_http_request_t *r)
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
     }
 
-    ngx_http_access_token_parse_args(r, &ctx);
+    ngx_http_access_token_set_args(r, &ctx);
 
     if (ngx_http_access_token_is_invalid_args(&ctx) != NGX_OK) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0, "Invalid request arguments");
@@ -202,49 +213,37 @@ static ngx_int_t ngx_http_access_token_handler(ngx_http_request_t *r)
     return NGX_OK;
 }
 
-static void ngx_http_access_token_parse_args(ngx_http_request_t *r, ngx_http_access_token_ctx_t *ctx)
+static void ngx_http_access_token_set_args(ngx_http_request_t *r, ngx_http_access_token_ctx_t *ctx)
 {
-    u_char *buf;
-    char   *tk, *sp1, *sp2, *k, *v;
-    size_t i, l, ll, lll;
+    ngx_int_t                  i;
+    ngx_http_variable_value_t *var;
+    ngx_uint_t                 key;
+    u_char                    *low[3];
+    ngx_str_t                  args[3] = { 
+        ngx_string("arg_accesskey"),
+        ngx_string("arg_expires"),
+        ngx_string("arg_signature")
+    };
 
-    l = r->args.len;
 
-    if ((buf = ngx_palloc(r->pool, l + 1)) == NULL) {
-        return;
-    }
-
-    ngx_cpystrn(buf, r->args.data, l + 1);
-
-    tk = strtok_r((char *)buf, "&", &sp1);
-    while (tk != NULL) {
-        k = strtok_r(tk,   "=", &sp2);
-        v = strtok_r(NULL, "&", &sp2);
-        if (k != NULL && v != NULL) {
-            ll = ngx_strlen(v);
-            if (ngx_strcmp(k, "AccessKey") == 0) {
-                if ((ctx->access_key = ngx_palloc(r->pool, ll + 1)) == NULL) {
-                    return;
-                }
-                ngx_cpystrn(ctx->access_key, (u_char *)v, ll + 1);
-            } else if (ngx_strcmp(k, "Expires") == 0) {
-                if ((ctx->expires = ngx_palloc(r->pool, ll + 1)) == NULL) {
-                    return;
-                }
-                ngx_cpystrn(ctx->expires, (u_char *)v, ll + 1);
-            } else if (ngx_strcmp(k, "Signature") == 0) {
-                lll = ll % 4;
-                lll = lll == 0 ? 0 : 4 - lll;
-                if ((ctx->sig = ngx_pcalloc(r->pool, ll + lll + 1)) == NULL) {
-                    return;
-                }
-                ngx_cpystrn(ctx->sig, (u_char *)v, ll + 1);
-                for (i=0;i<lll;i++) {
-                    ctx->sig[ll+i] = '=';
-                }
-            }
+    for (i=0;i<3;i++) {
+        low[i] = ngx_pnalloc(r->pool, args[i].len);
+        if (low[i] == NULL) {
+            return;
         }
-        tk = strtok_r(NULL, "&", &sp1);
+        key = ngx_hash_strlow(low[i], args[i].data, args[i].len);
+        var = ngx_http_get_variable(r, &args[i], key);
+        switch (i) {
+        case 0:
+            NGX_HTTP_ACCESS_TOKEN_SET_ARG(r, ctx->access_key, var);
+            break;
+        case 1:
+            NGX_HTTP_ACCESS_TOKEN_SET_ARG(r, ctx->expires, var);
+            break;
+        case 2:
+            NGX_HTTP_ACCESS_TOKEN_SET_ARG(r, ctx->sig, var);
+            break;
+        }
     }
 }
 
