@@ -32,6 +32,12 @@ class TestNginxAccessToken < MiniTest::Test
       }
     end
 
+    def test_invalid_access_key
+      get('/index.html?AccessKey=bokkko&Expires=1533240048&Signature=Y24uOnb+AWSlmvppucOWE3AbhDc=') { |res|
+        assert_equal(res.code, "403")
+      }
+    end
+
     def teardown
       `sudo pkill nginx`
     end
