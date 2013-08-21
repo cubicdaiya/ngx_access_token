@@ -1,0 +1,8 @@
+GPATH
+GRTAGS
+GTAGS
+GSYMS
+Gemfile.lock
+test/.bundle/
+test/ngx_base/scgi_temp
+test/ngx_base/uwsgi_temp
