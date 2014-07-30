@@ -278,14 +278,14 @@ static ngx_int_t ngx_http_access_token_build_plain_text(ngx_http_request_t *r, n
         return NGX_ERROR;
     }
 
-    p = ngx_cpystrn(buf, r->method_name.data, r->method_name.len + 1);
-    p = ngx_cpystrn(p, r->uri.data, r->uri.len + 1);
-    p = ngx_cpystrn(p, ctx->expires.data, ctx->expires.len + 1);
+    p = buf;
+    p = ngx_cpystrn(p, r->method_name.data,  r->method_name.len  + 1);
+    p = ngx_cpystrn(p, r->uri.data,          r->uri.len          + 1);
+    p = ngx_cpystrn(p, ctx->expires.data,    ctx->expires.len    + 1);
     p = ngx_cpystrn(p, ctx->access_key.data, ctx->access_key.len + 1);
 
     plain->data = buf;
     plain->len  = len;
-    plain->data[len] = '\0';
 
     return NGX_OK;
 }
